@@ -33,6 +33,9 @@ from keras.applications.vgg16 import VGG16
 import sys
 # sys.stdout = open('./code/adapted_deep_embeddings/log.txt','wt')
 
+
+
+
 '''
 Get Tiny ImageNet dataset
 '''

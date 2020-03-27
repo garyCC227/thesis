@@ -20,7 +20,7 @@ from keras.layers import Dense, Dropout, Flatten
 from keras.layers import Conv2D, MaxPooling2D,GlobalAveragePooling2D, ReLU, MaxPool2D,InputLayer
 from keras.layers.normalization import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU   
-from keras import optimizers
+from keras import optimizers, regularizers
 from sklearn.metrics import classification_report
 from keras.callbacks import TensorBoard
 import datetime
@@ -28,74 +28,120 @@ import imgaug.augmenters as iaa
 from keras.preprocessing.image import ImageDataGenerator
 from keras.applications.resnet50 import preprocess_input
 
-# import sys
+import sys
 # sys.stdout = open('./code/adapted_deep_embeddings/log.txt','wt')
-def get_model(input_shape):
-  kernel_size = 7
-  model = Sequential([
-    InputLayer(input_shape=input_shape),
-    Conv2D(32,kernel_size ),
-    BatchNormalization(),
-    ReLU(),
-    MaxPooling2D(pool_size=(3,3), strides=(2,2)),
-    Conv2D(64,kernel_size , input_shape=input_shape),
-    BatchNormalization(),
-    ReLU(),
-    MaxPooling2D(pool_size=(3,3), strides=(2,2)),
-     Conv2D(128,kernel_size , input_shape=input_shape),
-    BatchNormalization(),
-    ReLU(),
-    MaxPooling2D(pool_size=(3,3), strides=(2,2)),
-     Conv2D(256,kernel_size , input_shape=input_shape),
-    BatchNormalization(),
-    ReLU(),
-    MaxPooling2D(pool_size=(3,3), strides=(2,2)),
-     Conv2D(512,kernel_size , input_shape=input_shape),
-    BatchNormalization(),
-    ReLU(),
-    GlobalAveragePooling2D(),
-    Dense(5, activation='sigmoid'),
-  ])
-  return model
+
+def check_num_each_class(train_y, test_y, val_y):
+    zero, one, two, three, four = 0, 0, 0, 0, 0
+    for e in train_y:
+        if e == 0:
+            zero += 1
+        elif e == 1:
+            one += 1
+        elif e == 2:
+            two += 1
+        elif e == 3:
+            three += 1
+        elif e == 4:
+            four += 1
+
+    print("each classes has # images in train:\n")
+    print(zero, one, two, three, four)
+
+    zero, one, two, three, four = 0, 0, 0, 0, 0
+    for e in test_y:
+        if e == 0:
+            zero += 1
+        elif e == 1:
+            one += 1
+        elif e == 2:
+            two += 1
+        elif e == 3:
+            three += 1
+        elif e == 4:
+            four += 1
+
+    print("each classes has # images in train:\n")
+    print(zero, one, two, three, four)
+
+    zero, one, two, three, four = 0, 0, 0, 0, 0
+    for e in val_y:
+        if e == 0:
+            zero += 1
+        elif e == 1:
+            one += 1
+        elif e == 2:
+            two += 1
+        elif e == 3:
+            three += 1
+        elif e == 4:
+            four += 1
+
+    print("each classes has # images in train:\n")
+    print(zero, one, two, three, four)
 
 # def get_model(input_shape):
-  
-#   base_model =InceptionV3(weights='imagenet', include_top=False, input_shape=input_shape)
-#   #for layer in  base_model.layers[:10]:
-#     #layer.trainable = False
-#     #layer.padding='same'
- 
-#   #for layer in  base_model.layers[10:]:
-#     #layer.trainable = True
-#     #layer.padding='same'
-    
-#   # x = base_model.get_layer('avg_pool').output
-#   x = base_model.output
-#   x = GlobalAveragePooling2D()(x)
-#   # x = BatchNormalization()(x)
-#   x = Dropout(0.5)(x)
-
-#   # x = Flatten() (x)
-    
-#   x = Dense(1024, activation='relu')(x)
-#   # x = BatchNormalization()(x)
-#   x = Dropout(0.5)(x)
-# #   x = Dense(32, activation='relu')(x)
-#   # x = Dense(128, activation='relu')(x)
-#   # x = Dropout(0.5)(x)
-# #   x = Dense(2048, activation='relu')(x)
-# #   x = Dense(64, activation='relu')(x)
-# #   x = LeakyReLU(alpha=0.1)(x)
-    
-# #   x = Dropout(0.3)(x)
-#   #x = Dense(5, activation='softmax')(x)
-#   #model = Model(base_model.input, x)
-#   predictions = Dense(5, activation='sigmoid')(x)
-#   model = Model(inputs=base_model.input, outputs=predictions)
-#   # for layer in model.layers[:-6]:
-#   #   layer.trainable = False
-
+#   kernel_size = 5
+#   model = Sequential([
+#     InputLayer(input_shape=input_shape),
+#     Conv2D(64,kernel_size ),
+#     BatchNormalization(),
+#     ReLU(),
+#     MaxPooling2D(pool_size=(3,3), strides=(2,2)),
+#     Conv2D(128,kernel_size , input_shape=input_shape),
+#     BatchNormalization(),
+#     ReLU(),
+#     MaxPooling2D(pool_size=(3,3), strides=(2,2)),
+#     Conv2D(256,kernel_size , input_shape=input_shape),
+#     BatchNormalization(),
+#     ReLU(),
+#     MaxPooling2D(pool_size=(3,3), strides=(2,2)),
+#     Conv2D(512,kernel_size , input_shape=input_shape),
+#     BatchNormalization(),
+#     ReLU(),
+#     GlobalAveragePooling2D(),
+#     Dense(5, activation='softmax'),
+#   ])
 #   return model
+
+def get_model(input_shape):
+  
+  base_model =ResNet50(weights='imagenet', include_top=False, input_shape=input_shape)
+  #for layer in  base_model.layers[:10]:
+    #layer.trainable = False
+    #layer.padding='same'
+ 
+  #for layer in  base_model.layers[10:]:
+    #layer.trainable = True
+    #layer.padding='same'
+    
+  # x = base_model.get_layer('avg_pool').output
+  x = base_model.output
+#   x = GlobalAveragePooling2D()(x)
+  # x = BatchNormalization()(x)
+#   x = Dropout(0.5)(x)
+
+  x = Flatten() (x)
+  # x = Dropout(0.5)(x)
+  x = Dense(1024, activation='relu')(x)
+#   # x = BatchNormalization()(x)
+  # x = Dropout(0.5)(x)
+#   x = Dense(32, activation='relu')(x)
+  # x = Dense(128, activation='relu')(x)
+  # x = Dropout(0.5)(x)
+#   x = Dense(2048, activation='relu')(x)
+#   x = Dense(64, activation='relu')(x)
+#   x = LeakyReLU(alpha=0.1)(x)
+    
+  x = Dropout(0.5)(x)
+  #x = Dense(5, activation='softmax')(x)
+  #model = Model(base_model.input, x)
+  predictions = Dense(5, activation='softmax')(x)
+  model = Model(inputs=base_model.input, outputs=predictions)
+  for layer in model.layers[:-5]:
+    layer.trainable = False
+
+  return model
 
 def split_data(data_dict):
     trainset = []
@@ -104,7 +150,7 @@ def split_data(data_dict):
     for label, images in data_dict.items():
         random.shuffle(images)
         img_train, img_test = train_test_split(images, test_size=0.2)
-        img_train, img_val = train_test_split(img_train,test_size=0.2)
+        img_train, img_val = train_test_split(img_train,test_size=0.1)
         trainset = trainset + img_train
         valset = valset + img_val
         testset = testset + img_test
@@ -147,9 +193,9 @@ def main():
     labels = np.array(data['image_labels'])
     images = np.array(data['image_names'])
     
-    k=500#TODO
-    epoch = 150
-    NN_layer = "Inception_{}classes_binaryCross_sigmoid_{}_epoch{}_imagenet_imgaug".format(classes,k,epoch) #TODO
+    k=1000#TODO
+    epoch = 120
+    NN_layer = "resnet_{}classes_SparseCross_sigmoid_{}_epoch{}_imagenet".format(classes,k,epoch) #TODO
     BS = 32 #batch size
     print(NN_layer)
     # NN_layer = "Flaten"
@@ -203,35 +249,38 @@ def main():
     val_y = []
     random.shuffle(val_test)
     for features, label in val_test:
+        features = preprocess_input(features)
         val_x.append(features)
         val_y.append(label)
         
     val_x=np.array(val_x).reshape(val_size,224,224,3)
-    val_x = val_x.astype('float32') / 255.0
+    # val_x = val_x.astype('float32') / 255.0
 
     train_x = []
     train_y = []
     random.shuffle(img_train)
     for features, label in img_train:
+        features = preprocess_input(features)
         train_x.append(features)
         train_y.append(label)
         
     train_x=np.array(train_x).reshape(train_size,224,224,3)
-    train_x = train_x.astype('float32') / 255.0
+    # train_x = train_x.astype('float32') / 255.0
 
     test_x = []
     test_y = []
     random.shuffle(img_test)
     for features, label in img_test:
+        features = preprocess_input(features)
         test_x.append(features)
         test_y.append(label)
         
     test_x=np.array(test_x).reshape(test_size,224,224,3)
     test_x = test_x.astype('float32')/255.0
 
-    train_y=to_categorical(train_y)
-    test_y=to_categorical(test_y)
-    val_y=to_categorical(val_y)
+    # train_y=to_categorical(train_y)
+    # test_y=to_categorical(test_y)
+    # val_y=to_categorical(val_y)
 
 
     # new_train_x = []
@@ -239,20 +288,21 @@ def main():
     # val_x = preprocess_input(val_x)
 
     image_gen = ImageDataGenerator(
-                                horizontal_flip=True,
-                                vertical_flip=True,
-                               data_format='channels_last')
-    image_gen.fit(train_x)
-
-    img_gen=image_gen.flow(train_x, train_y, batch_size=BS, shuffle=True)
-    # img_gen = create_custom_gen(img_gen)
-    val_imgaug = ImageDataGenerator(
+                                # rescale=1./255,
+                                # rotation_range=90,
                                 # horizontal_flip=True,
                                 # vertical_flip=True,
-                               data_format='channels_last')
-    val_imgaug.fit(val_x)
-    val_gen=val_imgaug.flow(val_x, val_y, batch_size=10, shuffle=False)
+                               data_format='channels_last'
+                               )
+ 
+    img_gen=image_gen.flow(train_x, train_y, batch_size=BS, shuffle=True)
+    # img_gen = create_custom_gen(img_gen)
+    test_datagen = ImageDataGenerator()
 
+    val_gen=test_datagen.flow(val_x, val_y, batch_size=32, shuffle=False)
+    # test_gen=test_datagen.flow(test_x, test_y, batch_size=20, shuffle=False)
+
+    check_num_each_class(train_y, test_y, val_y)
 
     # for val_batch, Y in val_gen:
     #   for i in range(10):
@@ -285,9 +335,9 @@ def main():
 
     model50 = get_model(input_shape=(224,224,3))
     model50.summary()
-    adam = optimizers.Adam(lr=0.001)
+    adam = optimizers.Adam(lr=0.01)
     model50.compile(optimizer=adam,
-                        loss='binary_crossentropy',
+                        loss='sparse_categorical_crossentropy',
                         metrics=['accuracy'])
     log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard = TensorBoard(log_dir=log_dir, histogram_freq=0,
@@ -295,14 +345,26 @@ def main():
     
 
     # train_model=model50.fit(train_x, train_y, batch_size=8,epochs=epoch,verbose=1,validation_data=(val_x, val_y), callbacks=[tensorboard])
-    train_model = model50.fit_generator(img_gen, validation_data=val_gen,validation_steps = len(val_x)//10, epochs=epoch, steps_per_epoch=len(train_x)//BS, verbose=1)
+    # train_model = model50.fit_generator(img_gen, validation_data=val_gen,validation_steps = len(val_x)//32, epochs=10, steps_per_epoch=len(train_x)//BS, verbose=1)
 
-    (loss, accuracy) =  model50.evaluate(test_x, test_y, batch_size=10, verbose=1)
+    # ## start train
+    # for layer in model50.layers[:165]:
+    #   layer.trainable = False
+    # for layer in model50.layers[165:]:
+    #   layer.trainable = True
+
+    # model50.compile(optimizer=optimizers.Adam(lr=0.01)  ,
+    #                     loss='sparse_categorical_crossentropy',
+    #                     metrics=['accuracy'])
+    
+    train_model = model50.fit_generator(img_gen, validation_data=(val_gen),validation_steps = len(val_x)//32, epochs=epoch, steps_per_epoch=len(train_x)//BS, verbose=1, callbacks=[tensorboard])
+
+    (loss, accuracy) =   model50.evaluate(test_x, test_y, batch_size=64, verbose=1)
     print( 'loss = {:.4f}, accuracy: {:.4f}%'.format(loss,accuracy*100))
 
 
     test_pred = model50.predict(test_x, verbose=1, batch_size=64).argmax(axis=1)
-    test_true=test_y.argmax(axis=1) 
+    test_true=test_y
     # print(train_model.Hisory.keys())
     print(classification_report(test_true, test_pred, target_names=["0","1","2","3","4"]))
 
