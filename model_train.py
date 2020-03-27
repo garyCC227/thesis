@@ -414,14 +414,14 @@ def main():
     # NN_layer = "Flaten"
     # print("drop out with global pool {}\n".format(k))
     # print("normal flaten {}\n".format(k))
-    # random.shuffle(images) #TODO:
+
     zero_images = images[labels == 0][:k]
     one_images = images[labels == 1][:k]
     two_images = images[labels == 2][:k]
     three_images = images[labels == 3][:k]
     four_images1 = images[labels == 4][:k]
 
-    # add more 
+    # add more data for class 4
     four_images2 = []
 
     if len(four_images1) < k :
