@@ -112,3 +112,5 @@ log.txt
 checkpoint
 model.ckpt*
 replication*/
+
+logs1/

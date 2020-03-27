@@ -1,0 +1,20 @@
+#!/bin/bash
+
+#PBS -N MyJOB1
+#PBS -l select=1:ngpus=2:mem=92gb:ncpus=16
+#PBS -l walltime=12:00:00
+#PBS -k eod
+#PBS -j oe
+#PBS -M z5163479@student.unsw.edu.au
+#PBS -m ae
+
+module load cuda/10.1
+module load cudnn/7.6.1-cuda10.1
+module load tensorflow/1.14gpu
+
+
+cd $PBS_O_WORDIR
+
+
+source ./code/adapted_deep_embeddings/env/bin/activate
+python3 ./code/adapted_deep_embeddings/train.py
