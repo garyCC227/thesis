@@ -56,6 +56,9 @@ import sys
 #   ])
 #   return model
 
+'''
+resnet50
+'''
 def get_model(input_shape):
   
   base_model =ResNet50(weights='imagenet', include_top=False, input_shape=input_shape)
@@ -75,25 +78,29 @@ def get_model(input_shape):
 
 #   x = Flatten() (x)
 #   x = Dropout(0.5)(x)
-  x = Dense(512, activation='relu', kernel_regularizer=regularizers.l2(0.001))(x)
-#   # x = BatchNormalization()(x)
+  # x = Dense(512, activation='relu', kernel_regularizer=regularizers.l2(0.001))(x)
+  x = BatchNormalization()(x)
 #   x = Dropout(0.5)(x)
 #   x = Dense(32, activation='relu')(x)
-  # x = Dense(128, activation='relu')(x)
-  # x = Dropout(0.5)(x)
-#   x = Dense(2048, activation='relu')(x)
-#   x = Dense(512, activation='relu')(x)
-#   x = LeakyReLU(alpha=0.1)(x)
-    
+  x = Dense(128, activation='relu', kernel_regularizer=regularizers.l2(0.001))(x)
   x = Dropout(0.5)(x)
+  x = BatchNormalization()(x)
+  x = Dense(64, activation='relu', kernel_regularizer=regularizers.l2(0.001))(x)
+  x = Dropout(0.5)(x)
+  x = BatchNormalization()(x)
+#   x = Dense(512, activation='relu')(x)
+  # x = LeakyReLU(alpha=0.1)(x)
+    
+#   x = Dropout(0.3)(x)
   #x = Dense(5, activation='softmax')(x)
   #model = Model(base_model.input, x)
   predictions = Dense(5, activation='softmax')(x)
   model = Model(inputs=base_model.input, outputs=predictions)
-  for layer in model.layers[:-4]:
-    layer.trainable = False
+#   for layer in model.layers[:-2]:
+#     layer.trainable = False
 
   return model
+
 
 def split_data(data):
     random.shuffle(data)
@@ -106,13 +113,13 @@ def create_data(images_path, labels):
     data = []
     zip_data = list(zip(labels, images_path))
     random.shuffle(zip_data)
-    zip_data = zip_data[:7000]
+    # zip_data = zip_data[:7000]
 
     for label, img_path in zip_data:
         # print(img_paths)
         img = image.load_img(img_path, target_size=(224,224))
         img = image.img_to_array(img)
-        img = preprocess_input(img)
+        # img = preprocess_input(img)
         data.append([img, label])
 
     return data
@@ -212,7 +219,7 @@ def main():
         val_y.append(label)
         
     val_x=np.array(val_x).reshape(val_size,224,224,3)
-    # val_x = val_x.astype('float32') / 255
+    val_x = val_x.astype('float32') / 255
 
     train_x = []
     train_y = []
@@ -221,7 +228,7 @@ def main():
         train_y.append(label)
         
     train_x=np.array(train_x).reshape(train_size,224,224,3)
-    # train_x = train_x.astype('float32') / 255
+    train_x = train_x.astype('float32') / 255
 #
     test_x = []
     test_y = []
@@ -230,13 +237,13 @@ def main():
         test_y.append(label)
         
     test_x=np.array(test_x).reshape(test_size,224,224,3)
-    # test_x = test_x.astype('float32')/255
+    test_x = test_x.astype('float32')/255
 
-    check_num_each_class(train_y, test_y, val_y)
+    # check_num_each_class(train_y, test_y, val_y)
 
-    # train_y=to_categorical(train_y)
-    # test_y=to_categorical(test_y)
-    # val_y=to_categorical(val_y)
+    train_y=to_categorical(train_y)
+    test_y=to_categorical(test_y)
+    val_y=to_categorical(val_y)
 
     model50 = get_model(input_shape=(224,224,3))
     model50.summary()
@@ -245,15 +252,31 @@ def main():
     log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard = TensorBoard(log_dir=log_dir, histogram_freq=0,
                           write_graph=True, write_images=False)
-    model50.compile(optimizer=adam,
-                        loss='sparse_categorical_crossentropy',
-                        metrics=['accuracy'])
+    model50.compile(
+#                 optimizer=adam,
+                  optimizers.RMSprop(lr=2e-5),
+#                 optimizer=sgd2,
+#                     loss='categorical_crossentropy',
+                    # loss='kullback_leibler_divergence',
+                    loss= 'binary_crossentropy',
+                    metrics=['acc'])
     
 
-    image_gen = ImageDataGenerator(
-                                # horizontal_flip=True,
-                                # vertical_flip=True,
-                               data_format='channels_last')
+    '''
+Image augmentation
+'''
+image_gen = ImageDataGenerator(
+#                               rescale=1./255
+                            rotation_range=45,
+                            width_shift_range=0.1,
+                            height_shift_range=0.1,
+#                             zoom_range=0.2,
+#                             shear_range=0.1,
+                            horizontal_flip=True,
+                            vertical_flip=True,
+#                             fill_mode='nearest'
+                           data_format='channels_last'
+                           )
     image_gen.fit(train_x)
 
     img_gen=image_gen.flow(train_x, train_y, batch_size=BS, shuffle=True)
@@ -262,6 +285,7 @@ def main():
     log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard = TensorBoard(log_dir=log_dir, histogram_freq=0,
                           write_graph=True, write_images=False)
+
     train_model = model50.fit_generator(img_gen, validation_data=(val_x, val_y), epochs=epoch, steps_per_epoch=len(train_x)//BS, verbose=1, callbacks=[tensorboard])
 
     # train_model=model50.fit(train_x, train_y, batch_size=8,epochs=epoch,verbose=1,validation_data=(val_x, val_y),  callbacks=[tensorboard])
@@ -271,8 +295,8 @@ def main():
 
 
     test_pred = model50.predict(test_x, verbose=1, batch_size=64).argmax(axis=1)
-    test_true=test_y
-    print(test_pred)
+    test_true=test_y.argmax(axis=1)
+    # print(test_pred)
     # print(train_model.Hisory.keys())
     print(classification_report(test_true, test_pred, target_names=["0","1","2","3","4"]))
 

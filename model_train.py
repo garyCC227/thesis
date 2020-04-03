@@ -290,28 +290,31 @@ def get_model(input_shape):
     
 #   x = base_model.get_layer('avg_pool').output
   x = base_model.output
-  x = GlobalAveragePooling2D()(x)
+#   x = GlobalAveragePooling2D()(x)
   # x = BatchNormalization()(x)
 #   x = Dropout(0.5)(x)
 
-#   x = Flatten() (x)
+  x = Flatten() (x)
 #   x = Dropout(0.5)(x)
   # x = Dense(512, activation='relu', kernel_regularizer=regularizers.l2(0.001))(x)
-#   # x = BatchNormalization()(x)
+  x = BatchNormalization()(x)
 #   x = Dropout(0.5)(x)
 #   x = Dense(32, activation='relu')(x)
-  # x = Dense(128, activation='relu')(x)
-  # x = Dropout(0.5)(x)
-#   x = Dense(2048, activation='relu')(x)
+  x = Dense(128, activation='relu')(x)
+  x = Dropout(0.5)(x)
+  x = BatchNormalization()(x)
+  x = Dense(64, activation='relu')(x)
+  x = Dropout(0.5)(x)
+  x = BatchNormalization()(x)
 #   x = Dense(512, activation='relu')(x)
   # x = LeakyReLU(alpha=0.1)(x)
     
-  x = Dropout(0.5)(x)
+#   x = Dropout(0.3)(x)
   #x = Dense(5, activation='softmax')(x)
   #model = Model(base_model.input, x)
   predictions = Dense(5, activation='softmax')(x)
   model = Model(inputs=base_model.input, outputs=predictions)
-#   for layer in model.layers[:-2]:
+#   for layer in model.layers[:7]:
 #     layer.trainable = False
 
   return model
@@ -321,7 +324,7 @@ VGG16
 '''
 # def get_model(input_shape):
   
-#   image_input = Input(shape = (224,224, 3))
+#   image_input = Input(shape = (587,587, 3))
 #   model = VGG16(input_tensor = image_input, weights = 'imagenet')
 #   # model = ResNet50(weights='imagenet', include_top=False, input_tensor = image_input)
 #   # model.summary()
@@ -374,7 +377,7 @@ def create_data(images_dict):
         for img_path in img_paths:
             img = image.load_img(img_path, target_size=(587,587))
             img = image.img_to_array(img)
-            img = preprocess_input(img)
+            # features = preprocess_input(img,  mode='torch', data_format='channels_last')
             data[label].append([img, label])
 
     return data
@@ -389,13 +392,13 @@ def create_custom_gen(img_gen):
     ])
     for X_batch, y_batch in img_gen:
         hue = seq(images = X_batch.astype(np.uint8))
-        yield hue, y_batch
+        yield hue.astype('float32')/255.0, y_batch
 
 def main():
     # path = 'E:\\aptos\\labelsbase15.json'
     classes = n = 5  #TODO:
     
-    k= 500 #TODO
+    k= 1000 #TODO
     path_base = "/home/z5163479/code/base15.json"
     path_novel = "/home/z5163479/code/novel15.json"
     with open(path_base, 'r') as f:
@@ -404,7 +407,7 @@ def main():
     labels = np.array(data['image_labels'])
     images = np.array(data['image_names'])
     
-    epoch = 60
+    epoch = 150
     NN_layer = "resnet_{}classes_SparseCross_sigmoid_{}_epoch{}_imagenet".format(classes,k,epoch) #TODO
     BS = 32 #batch size
     print(NN_layer)
@@ -433,10 +436,11 @@ def main():
         add_labels = np.array(add_data['image_labels'])
         add_images = np.array(add_data['image_names'])
         n = k - len(four_images1)
-        four_images2 = add_images[labels == 4][:n]
+        four_images2 = add_images[add_labels == 4][:n]
 
     four_images = [y for x in [four_images1, four_images2] for y in x]
     print("0 images: {}, four images: {}".format(len(zero_images), len(four_images)))
+    print("1 images: {}, two images: {}, three images: {}".format(len(one_images), len(two_images), len(three_images)))
 
     # print(zero_images.shape)
     images_dict = {
@@ -467,18 +471,18 @@ def main():
     val_y = []
     random.shuffle(val_test) 
     for features, label in val_test:
-        features = preprocess_input(features,  mode='torch', data_format='channels_last')
+        # features = preprocess_input(features,  mode='torch', data_format='channels_last')
         val_x.append(features)
         val_y.append(label)
         
     val_x=np.array(val_x).reshape(val_size,587,587,3)
-    # val_x = val_x.astype('float32') / 255.0
+    val_x = val_x.astype('float32') / 255.0
 
     train_x = []
     train_y = []
     random.shuffle(img_train)
     for features, label in img_train:
-        features = preprocess_input(features,  mode='torch', data_format='channels_last')
+        # features = preprocess_input(features,  mode='torch', data_format='channels_last')
         train_x.append(features)
         train_y.append(label)
         
@@ -489,28 +493,36 @@ def main():
     test_y = []
     random.shuffle(img_test)
     for features, label in img_test:
-        features = preprocess_input(features, mode='torch', data_format='channels_last')
+        # features = preprocess_input(features, mode='torch', data_format='channels_last')
         test_x.append(features)
         test_y.append(label)
         
     test_x=np.array(test_x).reshape(test_size,587,587,3)
-    # test_x = test_x.astype('float32')/255.0
+    test_x = test_x.astype('float32')/255.0
 
 
-    # train_y=to_categorical(train_y)
-    # test_y=to_categorical(test_y)
-    # val_y=to_categorical(val_y)
+    train_y=to_categorical(train_y)
+    test_y=to_categorical(test_y)
+    val_y=to_categorical(val_y)
+    
+    print(train_x.max(), train_x.min(), train_x.mean(), train_x.std())
+    print(val_x.max(), val_x.min(), val_x.mean(), val_x.std())
+    print(test_x.max(), test_x.min(), test_x.mean(), test_x.std())
 
+    print(test_x.shape)
     '''
     Image augmentation
     '''
     image_gen = ImageDataGenerator(
+                                rescale=1./255,
                                 # rotation_range=45,
                                 # width_shift_range=0.2,
                                 # height_shift_range=0.2,
-                                # horizontal_flip=True,
-                                # vertical_flip=True,
-                                # fill_mode='nearest',
+                                # zoom_range=0.2,
+                                # shear_range=0.1,
+                                horizontal_flip=True,
+                                vertical_flip=True,
+                                fill_mode='nearest'
                             #    data_format='channels_last'
                                )
  
@@ -527,25 +539,30 @@ def main():
     model50 = get_model(input_shape=(587,587,3))
     model50.summary()
     adam = optimizers.Adam(lr=0.001)
-    model50.compile(optimizer=adam,
-                        loss='sparse_categorical_crossentropy',
+    sgd2 = optimizers.SGD(lr=0.001, decay=1e-6, momentum=0.9)
+    model50.compile(
+                    optimizer=adam,
+                    # optimizer = optimizers.RMSprop(lr=2e-5),
+                    # optimizer=sgd2,
+                        # loss='sparse_categorical_crossentropy',
                         # loss='kullback_leibler_divergence',
-                        metrics=['accuracy'])
+                        loss= 'binary_crossentropy',
+                        metrics=['acc'])
     # Tensorboard
-    log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    tensorboard = TensorBoard(log_dir=log_dir, histogram_freq=0,
-                          write_graph=True, write_images=False)
+    # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    # tensorboard = TensorBoard(log_dir=log_dir, histogram_freq=0,
+    #                       write_graph=True, write_images=False)
     
     '''
     fine-tune some conv layers
     '''
     # # # train_model=model50.fit(train_x, train_y, batch_size=8,epochs=epoch,verbose=1,validation_data=(val_x, val_y), callbacks=[tensorboard])
-    # train_model = model50.fit_generator(img_gen, validation_data=(test_x, test_y), epochs=10, steps_per_epoch=len(train_x)//BS, verbose=1)
+    # train_model = model50.fit_generator(img_gen, validation_data=(val_x, val_y), epochs=3, steps_per_epoch=len(train_x)//BS, verbose=1)
 
-    # ## start train
-    # for layer in model50.layers[:165]:
+    ## start train
+    # for layer in model50.layers[:7]:
     #   layer.trainable = False
-    # for layer in model50.layers[165:]:
+    # for layer in model50.layers[7:]:
     #   layer.trainable = True
 
     # model50.compile(optimizer=optimizers.Adam(lr=1e-5)  ,
@@ -554,18 +571,24 @@ def main():
     #                     # loss='kullback_leibler_divergence',
     #                     metrics=['accuracy'])
     
-    train_model = model50.fit_generator(img_gen, validation_data=(val_x, val_y), epochs=epoch, steps_per_epoch=len(train_x)//BS, verbose=1, callbacks=[tensorboard])
+    train_model = model50.fit_generator(img_gen, validation_data=(val_x, val_y), epochs=epoch, steps_per_epoch=len(train_x)//BS, verbose=1)
 
     (loss, accuracy) = model50.evaluate(test_x, test_y, batch_size=64, verbose=1)
     print( 'loss = {:.4f}, accuracy: {:.4f}%'.format(loss,accuracy*100))
 
 
     test_pred = model50.predict(test_x, verbose=1, batch_size=64).argmax(axis=1)
-    # test_true=test_y.argmax(axis=1) 
-    test_true=test_y
+    test_true=test_y.argmax(axis=1) 
+    # test_true=test_y
     # print(train_model.Hisory.keys())
     print(classification_report(test_true, test_pred, target_names=["0","1","2","3","4"]))
 
+    print("train_x -> confusion matrix_______________________________________")
+    test_pred = model50.predict(train_x.astype('float32')/255.0, verbose=1, batch_size=64).argmax(axis=1)
+    test_true=train_y.argmax(axis=1) 
+    # test_true=test_y
+    # print(train_model.Hisory.keys())
+    print(classification_report(test_true, test_pred, target_names=["0","1","2","3","4"]))
     # plt.figure()
     # plt.plot(train_model.history['accuracy'])
     # plt.plot(train_model.history['val_accuracy'])
