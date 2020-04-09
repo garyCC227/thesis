@@ -12,7 +12,6 @@ from sklearn.model_selection import train_test_split
 from keras.utils import to_categorical
 from keras.layers import Dense, Dropout, Flatten
 from keras.applications.resnet50 import ResNet50
-from keras.applications.resnet import ResNet152
 from keras.applications.inception_v3 import InceptionV3
 import keras
 from keras.models import Sequential,Input,Model
@@ -27,8 +26,13 @@ import datetime
 import imgaug.augmenters as iaa
 from keras.preprocessing.image import ImageDataGenerator
 from keras.applications.resnet50 import preprocess_input
-
+from keras.applications import DenseNet121
+from keras import layers
 import sys
+import tensorflow as tf
+
+np.random.seed(2019)
+tf.set_random_seed(2019)
 # sys.stdout = open('./code/adapted_deep_embeddings/log.txt','wt')
 
 # def check_num_each_class(train_y, test_y, val_y):
@@ -122,7 +126,7 @@ def get_model(input_shape):
   x = base_model.output
   x = GlobalAveragePooling2D()(x)
   # x = BatchNormalization()(x)
-#   x = Dropout(0.5)(x)
+  x = Dropout(0.5)(x)
 
 #   x = Flatten() (x)
 #   x = Dropout(0.5)(x)
@@ -130,24 +134,46 @@ def get_model(input_shape):
 #   x = BatchNormalization()(x)
 #   x = Dropout(0.5)(x)
 #   x = Dense(32, activation='relu')(x)
-  x = Dense(128, activation='relu', kernel_regularizer=regularizers.l2(0.001))(x)
-  x = Dropout(0.5)(x)
-  x = BatchNormalization()(x)
-  x = Dense(64, activation='relu', kernel_regularizer=regularizers.l2(0.001))(x)
-  x = Dropout(0.5)(x)
-  x = BatchNormalization()(x)
+#   x = Dense(128, activation='relu', kernel_regularizer=regularizers.l2(0.001))(x)
+#   x = Dropout(0.5)(x)
+#   x = BatchNormalization()(x)
+#   x = Dense(64, activation='relu', kernel_regularizer=regularizers.l2(0.001))(x)
+#   x = Dropout(0.5)(x)
+#   x = BatchNormalization()(x)
 #   x = Dense(512, activation='relu')(x)
   # x = LeakyReLU(alpha=0.1)(x)
     
 #   x = Dropout(0.3)(x)
   #x = Dense(5, activation='softmax')(x)
   #model = Model(base_model.input, x)
-  predictions = Dense(5, activation='softmax')(x)
+  predictions = Dense(5, activation='sigmoid')(x)
   model = Model(inputs=base_model.input, outputs=predictions)
 #   for layer in model.layers[:-2]:
 #     layer.trainable = False
 
   return model
+
+
+
+# def get_model(input_shape):
+#     densenet = DenseNet121(
+#     weights='/home/z5163479/code/adapted_deep_embeddings/DenseNet-BC-121-32-no-top.h5',
+#     include_top=False,
+#     input_shape=input_shape
+#     )
+
+#     model = Sequential()
+#     model.add(densenet)
+#     model.add(layers.GlobalAveragePooling2D())
+#     model.add(layers.Dropout(0.5))
+#     model.add(layers.Dense(5, activation='sigmoid'))
+    
+    
+#     return model
+
+def get_preds(arr):
+    mask = arr == 0
+    return np.clip(np.where(mask.any(1), mask.argmax(1), 5) - 1, 0, 4)
 
 def split_data(data_dict):
     trainset = []
@@ -174,7 +200,7 @@ def create_data(images_dict):
         for img_path in img_paths:
             img = image.load_img(img_path, target_size=(224,224))
             img = image.img_to_array(img)
-            # img = preprocess_input(img)
+            # img = preprocess_input(img, mode='torch')
             data[label].append([img, label])
 
     return data
@@ -200,8 +226,8 @@ def main():
     labels = np.array(data['image_labels'])
     images = np.array(data['image_names'])
     
-    k=500#TODO
-    epoch = 150
+    k=1000#TODO
+    epoch = 50
     NN_layer = "resnet_{}classes_SparseCross_sigmoid_{}_epoch{}_imagenet".format(classes,k,epoch) #TODO
     BS = 32 #batch size
     print(NN_layer)
@@ -256,7 +282,7 @@ def main():
     val_y = []
     random.shuffle(val_test)
     for features, label in val_test:
-        features = preprocess_input(features)
+        # features = preprocess_input(features)
         val_x.append(features)
         val_y.append(label)
         
@@ -267,7 +293,7 @@ def main():
     train_y = []
     random.shuffle(img_train)
     for features, label in img_train:
-        features = preprocess_input(features)
+        # features = preprocess_input(features)
         train_x.append(features)
         train_y.append(label)
         
@@ -278,7 +304,7 @@ def main():
     test_y = []
     random.shuffle(img_test)
     for features, label in img_test:
-        features = preprocess_input(features)
+        # features = preprocess_input(features)
         test_x.append(features)
         test_y.append(label)
         
@@ -289,24 +315,41 @@ def main():
     test_y=to_categorical(test_y)
     val_y=to_categorical(val_y)
 
+    y_train_multi = np.empty(train_y.shape, dtype=train_y.dtype)
+    y_train_multi[:, 4] = train_y[:, 4]
+
+    for i in range(3, -1, -1):
+        y_train_multi[:, i] = np.logical_or(train_y[:, i], y_train_multi[:, i+1])
+    # y_train_multi.shape
+
+    y_test_multi = np.empty(test_y.shape, dtype=test_y.dtype)
+    y_test_multi[:, 4] = test_y[:, 4]
+
+    for i in range(3, -1, -1):
+        y_test_multi[:, i] = np.logical_or(test_y[:, i], y_test_multi[:, i+1])
+    # y_train_multi.shape
+
+
+
     image_gen = ImageDataGenerator(
 #                               rescale=1./255
                             # rotation_range=45,
-                            width_shift_range=0.1,
-                            height_shift_range=0.1,
-#                             zoom_range=0.2,
+                            # width_shift_range=0.1,
+                            # height_shift_range=0.1,
+                            zoom_range=0.15,
 #                             shear_range=0.1,
                             horizontal_flip=True,
                             vertical_flip=True,
-#                             fill_mode='nearest'
+                            fill_mode='constant',
+                            cval=0.,
                            data_format='channels_last'
                            )
  
-    img_gen=image_gen.flow(train_x, train_y, batch_size=BS, shuffle=True)
+    img_gen=image_gen.flow(train_x, y_train_multi, batch_size=BS, shuffle=True)
     # img_gen = create_custom_gen(img_gen)
-    test_datagen = ImageDataGenerator()
+    # test_datagen = ImageDataGenerator()
 
-    val_gen=test_datagen.flow(val_x, val_y, batch_size=32, shuffle=False)
+    # val_gen=test_datagen.flow(t, val_y, batch_size=32, shuffle=False)
     # test_gen=test_datagen.flow(test_x, test_y, batch_size=20, shuffle=False)
 
     # check_num_each_class(train_y, test_y, val_y)
@@ -342,16 +385,16 @@ def main():
 
     model50 = get_model(input_shape=(224,224,3))
     model50.summary()
-    adam = optimizers.Adam(lr=0.001)
+    adam = optimizers.Adam(lr=0.00005)
     model50.compile(
-                    # optimizer=adam,
-                  optimizers.RMSprop(lr=2e-5),
+                    optimizer=adam,
+                #   optimizers.RMSprop(lr=2e-5),
 #                 optimizer=sgd2,
-                    loss='categorical_crossentropy',
+                    # loss='categorical_crossentropy',
                     # loss='kullback_leibler_divergence',
-                    # loss= 'binary_crossentropy',
+                    loss= 'binary_crossentropy',
                         # loss='sparse_categorical_crossentropy',
-                        metrics=['acc'])
+                        metrics=['accuracy'])
     log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + 'cate255'
     tensorboard = TensorBoard(log_dir=log_dir, histogram_freq=0,
                           write_graph=True, write_images=False)
@@ -370,16 +413,29 @@ def main():
     #                     loss='sparse_categorical_crossentropy',
     #                     metrics=['accuracy'])
     
-    train_model = model50.fit_generator(img_gen, validation_data=(val_gen),validation_steps = len(val_x)//32, epochs=epoch, steps_per_epoch=len(train_x)//BS, verbose=1, callbacks=[tensorboard])
+    train_model = model50.fit_generator(img_gen, validation_data=(test_x, y_test_multi), epochs=epoch, steps_per_epoch=len(train_x)//BS, verbose=1, callbacks=[tensorboard])
 
-    (loss, accuracy) = model50.evaluate(test_x, test_y, batch_size=64, verbose=1)
+    (loss, accuracy) = model50.evaluate(test_x, y_test_multi, batch_size=64, verbose=1)
     print( 'loss = {:.4f}, accuracy: {:.4f}%'.format(loss,accuracy*100))
 
 
-    test_pred = model50.predict(test_x, verbose=1, batch_size=64).argmax(axis=1)
-    test_true=test_y.argmax(axis=1) 
-    # test_true=test_y
-    # print(train_model.Hisory.keys())
+    test_pred = model50.predict(test_x, verbose=1, batch_size=64)
+    arr = 1 * (test_pred > 0.5)
+    test_pred = get_preds(arr)
+    test_true = get_preds(y_test_multi)
+    # test_true=test_y.argmax(axis=1) 
+    # # test_true=test_y
+    # # print(train_model.Hisory.keys())
+    print(classification_report(test_true, test_pred, target_names=["0","1","2","3","4"]))
+
+    print("Train data")
+    test_pred = model50.predict(train_x, verbose=1, batch_size=64)
+    arr = 1 * (test_pred > 0.5)
+    test_pred = get_preds(arr)
+    test_true = train_y.argmax(axis=1)
+    # test_true=test_y.argmax(axis=1) 
+    # # test_true=test_y
+    # # print(train_model.Hisory.keys())
     print(classification_report(test_true, test_pred, target_names=["0","1","2","3","4"]))
 
     # plt.figure()
